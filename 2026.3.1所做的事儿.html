@@ -1,0 +1,633 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>MaiBot × 雨云服务器部署复盘（2026.2.27 起）增强版</title>
+  <style>
+    :root{
+      --bg:#0b0f17; --card:#121a27; --muted:#9fb0c3; --text:#e9f1ff;
+      --accent:#7aa2ff; --good:#37d67a; --warn:#ffcc66; --bad:#ff5c7a;
+      --line:#24324a; --accent2:#b48cff;
+      --mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      --sans: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Helvetica Neue", Arial, "Noto Sans", "Liberation Sans", sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0; font-family:var(--sans);
+      background:radial-gradient(1200px 600px at 30% -10%, #1a2a5a 0%, transparent 50%), var(--bg);
+      color:var(--text);
+    }
+    a{color:var(--accent); text-decoration:none}
+    a:hover{text-decoration:underline}
+    .wrap{max-width:1180px; margin:0 auto; padding:26px 18px 48px}
+    header{
+      display:flex; gap:16px; align-items:flex-start; justify-content:space-between; flex-wrap:wrap;
+      padding:18px; border:1px solid var(--line); background:linear-gradient(180deg, rgba(18,26,39,.92), rgba(18,26,39,.70));
+      border-radius:16px;
+    }
+    h1{margin:0; font-size:22px}
+    h2{margin:0 0 10px; font-size:16px}
+    h3{margin:12px 0 8px; font-size:13px; color:#d9e6ff}
+    .sub{margin-top:6px; color:var(--muted); font-size:13px; line-height:1.6}
+    .chips{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px}
+    .chip{
+      padding:6px 10px; border-radius:999px; font-size:12px; border:1px solid var(--line);
+      background:rgba(255,255,255,.02); color:var(--muted)
+    }
+    .chip.good{color:#baf7d2; border-color:rgba(55,214,122,.35)}
+    .chip.warn{color:#ffe3a3; border-color:rgba(255,204,102,.35)}
+    .grid{display:grid; grid-template-columns:320px 1fr; gap:14px; margin-top:14px}
+    @media (max-width:980px){ .grid{grid-template-columns:1fr} }
+    .card{
+      border:1px solid var(--line); background:rgba(18,26,39,.78); border-radius:16px; padding:14px;
+    }
+    .muted{color:var(--muted)}
+    .small{font-size:12px}
+    .mono{font-family:var(--mono)}
+    .row{display:flex; gap:10px; flex-wrap:wrap; align-items:center}
+    .btn{
+      border:1px solid var(--line); background:rgba(255,255,255,.02); color:var(--text);
+      padding:9px 10px; border-radius:12px; cursor:pointer; font-size:12px;
+    }
+    .btn:hover{border-color:#3a5278}
+    .btn.primary{border-color:rgba(122,162,255,.55); background:rgba(122,162,255,.10)}
+    .btn.good{border-color:rgba(55,214,122,.55); background:rgba(55,214,122,.10)}
+    input[type="search"]{
+      width:100%; padding:10px 12px; border-radius:12px; border:1px solid var(--line);
+      background:rgba(0,0,0,.25); color:var(--text); outline:none;
+    }
+    details{
+      border:1px solid var(--line); border-radius:14px; padding:10px 12px; background:rgba(255,255,255,.015);
+      margin:10px 0;
+    }
+    summary{cursor:pointer; user-select:none; font-weight:600}
+    .tag{
+      margin-left:8px; font-weight:500; font-size:11px; padding:2px 8px; border-radius:999px;
+      border:1px solid var(--line); color:var(--muted)
+    }
+    .tag.good{border-color:rgba(55,214,122,.35); color:#baf7d2}
+    .tag.warn{border-color:rgba(255,204,102,.35); color:#ffe3a3}
+    .tag.bad{border-color:rgba(255,92,122,.35); color:#ffb1bf}
+    pre{
+      margin:10px 0 0; padding:12px; border-radius:12px; overflow:auto;
+      background:rgba(0,0,0,.35); border:1px solid rgba(255,255,255,.06);
+      font-family:var(--mono); font-size:12px; line-height:1.45;
+    }
+    .kpi{display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px}
+    @media (max-width:900px){ .kpi{grid-template-columns:repeat(2,minmax(0,1fr))} }
+    @media (max-width:520px){ .kpi{grid-template-columns:1fr} }
+    .k{
+      border:1px solid var(--line); background:rgba(0,0,0,.18); border-radius:14px; padding:10px;
+    }
+    .k .v{font-size:18px; font-weight:700}
+    .k .l{font-size:12px; color:var(--muted); margin-top:4px}
+    .list{margin:8px 0 0; padding-left:18px}
+    .list li{margin:6px 0}
+    .toc a{
+      display:block; padding:8px 10px; border-radius:12px; border:1px solid transparent; color:#d7e6ff
+    }
+    .toc a:hover{border-color:var(--line); background:rgba(255,255,255,.02); text-decoration:none}
+    .hl{
+      border-left:3px solid rgba(122,162,255,.55); padding-left:10px; margin:10px 0; color:#d7e6ff
+    }
+    .section{scroll-margin-top:12px}
+    .foot{margin-top:14px; color:var(--muted); font-size:12px}
+    .hidden{display:none!important}
+    .hit{outline:1px solid rgba(122,162,255,.45); box-shadow:0 0 0 3px rgba(122,162,255,.08); border-radius:12px}
+    .split{display:grid; grid-template-columns:1fr 1fr; gap:12px}
+    @media (max-width:900px){ .split{grid-template-columns:1fr} }
+
+    /* 可视化 */
+    .bars{display:flex; flex-direction:column; gap:10px; margin-top:8px}
+    .bar-row{display:grid; grid-template-columns:130px 1fr 52px; gap:10px; align-items:center}
+    .bar-wrap{height:12px; border-radius:999px; background:rgba(255,255,255,.06); overflow:hidden; border:1px solid rgba(255,255,255,.05)}
+    .bar{height:100%; border-radius:999px; background:linear-gradient(90deg, var(--accent), var(--accent2))}
+    .wc{
+      min-height:220px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:center;
+      padding:10px; border-radius:14px; border:1px dashed rgba(255,255,255,.08); background:rgba(0,0,0,.14)
+    }
+    .wc span{display:inline-block; line-height:1; cursor:default}
+    .wc .w1{font-size:12px; color:#b4c2d8}
+    .wc .w2{font-size:16px; color:#d6e3ff}
+    .wc .w3{font-size:22px; color:#8db4ff}
+    .wc .w4{font-size:30px; color:#d7b2ff; font-weight:700}
+
+    /* 时间线 */
+    .timeline-switch{display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap}
+    .timeline{position:relative; margin-top:6px}
+    .timeline:before{
+      content:""; position:absolute; left:13px; top:0; bottom:0; width:2px; background:rgba(255,255,255,.08)
+    }
+    .t-item{
+      position:relative; padding-left:38px; margin:12px 0; padding-bottom:6px
+    }
+    .t-dot{
+      position:absolute; left:6px; top:4px; width:16px; height:16px; border-radius:999px;
+      background:var(--accent); border:2px solid #0b0f17;
+      box-shadow:0 0 0 3px rgba(122,162,255,.12)
+    }
+    .t-dot.good{background:var(--good)}
+    .t-dot.warn{background:var(--warn)}
+    .t-dot.bad{background:var(--bad)}
+    .t-card{
+      border:1px solid var(--line); border-radius:14px; padding:10px 12px; background:rgba(255,255,255,.02)
+    }
+    .t-head{display:flex; justify-content:space-between; gap:10px; flex-wrap:wrap}
+    .t-title{font-weight:700}
+    .t-meta{font-size:12px; color:var(--muted)}
+    .phase{
+      display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:10px; margin-top:10px
+    }
+    @media (max-width:900px){ .phase{grid-template-columns:1fr 1fr} }
+    @media (max-width:520px){ .phase{grid-template-columns:1fr} }
+    .phase-box{
+      border:1px solid var(--line); border-radius:14px; padding:10px; background:rgba(255,255,255,.02)
+    }
+    .phase-box .num{font-size:24px; font-weight:800}
+    .phase-box .name{font-size:12px; color:var(--muted)}
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>2026.2.27 雨云服务器开始｜MaiBot（QQ）部署复盘增强版</h1>
+      <div class="sub">
+        用于放进 Notion 的“网页式复盘页”。<br>
+        这版新增：<b>词云</b>、<b>主题占比</b>、<b>阶段视图</b>、<b>双视角时间线</b>。
+      </div>
+      <div class="chips">
+        <span class="chip good">✅ 已完成：登录 / WS 对接 / Core 唤醒</span>
+        <span class="chip warn">⚠️ 待优化：回复速度</span>
+        <span class="chip">服务器：雨云 NAT 模式</span>
+        <span class="chip">模型：BaiLian + qwen3.5-plus</span>
+      </div>
+    </div>
+    <div style="min-width:260px;max-width:360px">
+      <input id="q" type="search" placeholder="搜索：token / sqlite-web / EULA / qwen3.5-plus / ws://adapters:8095">
+      <div class="row" style="margin-top:10px">
+        <button class="btn primary" id="expandAll">展开全部</button>
+        <button class="btn" id="collapseAll">折叠全部</button>
+        <button class="btn good" id="copyBlock">复制摘要</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="grid">
+    <aside class="card toc">
+      <h2>目录</h2>
+      <a href="#status">1）当前状态</a>
+      <a href="#timeline">2）时间线</a>
+      <a href="#actions">3）我的动作清单</a>
+      <a href="#issues">4）问题库</a>
+      <a href="#report">5）年度报告风格摘要</a>
+      <a href="#viz">6）可视化模块</a>
+      <a href="#access">7）访问与 Token</a>
+      <a href="#ws">8）WebSocket 对接</a>
+      <a href="#perf">9）回复慢分析</a>
+      <a href="#diff">10）与官方建议差异</a>
+      <a href="#appendix">11）附录命令</a>
+    </aside>
+
+    <main class="card">
+      <section id="status" class="section">
+        <h2>1）当前状态</h2>
+        <div class="kpi">
+          <div class="k"><div class="v">✅ Core</div><div class="l">已成功唤醒并处理消息</div></div>
+          <div class="k"><div class="v">✅ Adapters</div><div class="l">已成功连接 ws://core:8000/ws</div></div>
+          <div class="k"><div class="v">✅ NapCat</div><div class="l">已成功登录 WebUI 与 QQ</div></div>
+          <div class="k"><div class="v">⚠️ 性能</div><div class="l">回复存在延迟，需继续排障</div></div>
+        </div>
+        <div class="hl">
+          你现在不是“没部署成功”，而是已经进入 <b>第二阶段：可用性优化</b>。  
+          主链路已经通了，后面重点是“为什么慢”“哪些配置值得继续开/关”。
+        </div>
+      </section>
+
+      <section id="timeline" class="section">
+        <h2>2）时间线</h2>
+
+        <div class="timeline-switch">
+          <button class="btn primary" data-mode="date">按日期看</button>
+          <button class="btn" data-mode="issue">按问题看</button>
+        </div>
+
+        <div class="phase">
+          <div class="phase-box"><div class="num">1</div><div class="name">准备阶段</div></div>
+          <div class="phase-box"><div class="num">2</div><div class="name">下载 / 初始化</div></div>
+          <div class="phase-box"><div class="num">3</div><div class="name">修复与兼容</div></div>
+          <div class="phase-box"><div class="num">4</div><div class="name">联通验证</div></div>
+          <div class="phase-box"><div class="num">5</div><div class="name">体验优化</div></div>
+        </div>
+
+        <div id="timeline-date" class="timeline">
+          <div class="t-item">
+            <div class="t-dot"></div>
+            <div class="t-card">
+              <div class="t-head">
+                <div class="t-title">2026-02-27｜项目起点</div>
+                <div class="t-meta">阶段：准备</div>
+              </div>
+              <ul class="list">
+                <li>确定只走官方 Docker Compose 路线</li>
+                <li>固定目录：<code>/root/workspace/maim-bot</code></li>
+                <li>目标：QQ 版 MaiBot 跑通 + 后续测试群验证</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="t-item">
+            <div class="t-dot bad"></div>
+            <div class="t-card">
+              <div class="t-head">
+                <div class="t-title">2026-03-01｜Docker 拉取失败</div>
+                <div class="t-meta">阶段：下载 / 初始化</div>
+              </div>
+              <ul class="list">
+                <li>报错：<code>unexpected media type text/html</code></li>
+                <li>定位：registry-mirrors 返回 HTML 错页，不是真正镜像层</li>
+                <li>处理：删除 mirrors，仅保留代理，重启 Docker</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="t-item">
+            <div class="t-dot warn"></div>
+            <div class="t-card">
+              <div class="t-head">
+                <div class="t-title">2026-03-01｜sqlite-web 阻塞初始化</div>
+                <div class="t-meta">阶段：修复与兼容</div>
+              </div>
+              <ul class="list">
+                <li>compose 中 <code>sqlite-web</code> manifest 有问题</li>
+                <li>为跑通主链路，先移除这个非核心辅助服务</li>
+                <li>结果：bot_config.toml / model_config.toml 成功生成</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="t-item">
+            <div class="t-dot bad"></div>
+            <div class="t-card">
+              <div class="t-head">
+                <div class="t-title">2026-03-01｜EULA / PRIVACY 阻塞</div>
+                <div class="t-meta">阶段：修复与兼容</div>
+              </div>
+              <ul class="list">
+                <li>后台容器无法交互输入“同意” → <code>EOFError</code></li>
+                <li>compose 写入 EULA / PRIVACY hash</li>
+                <li>同时修正 <code>docker-config/mmc/.env</code> 旧值覆盖问题</li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="t-item">
+            <div class="t-dot good"></div>
+            <div class="t-card">
+              <div class="t-head">
+                <div class="t-title">2026-03-01｜NapCat 登录 + WS Client 联通</div>
+                <div class="t-meta">阶段：联通验证</div>
+              </div>
+              <ul class="list">
+                <li>雨云 NAT 映射成功访问 WebUI</li>
+                <li>NapCat 登录成功</li>
+                <li>WebSocket Client 指向 <code>ws://adapters:8095</code></li>
+                <li>adapters 最终成功连接 <code>ws://core:8000/ws</code></li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="t-item">
+            <div class="t-dot warn"></div>
+            <div class="t-card">
+              <div class="t-head">
+                <div class="t-title">2026-03-01｜进入“回复慢”优化阶段</div>
+                <div class="t-meta">阶段：体验优化</div>
+              </div>
+              <ul class="list">
+                <li>你发送“你好”“你是谁”等消息后，存在明显延迟</li>
+                <li>当前怀疑：模型响应慢 / 规划链路长 / 代理影响 / 资源抖动</li>
+                <li>下一步：链路打点 + 资源基线 + 逐项排除</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div id="timeline-issue" class="timeline hidden">
+          <div class="t-item">
+            <div class="t-dot bad"></div>
+            <div class="t-card">
+              <div class="t-title">问题一：镜像拉取失败</div>
+              <div class="t-meta">关键词：registry-mirrors / proxy / text/html</div>
+            </div>
+          </div>
+          <div class="t-item">
+            <div class="t-dot warn"></div>
+            <div class="t-card">
+              <div class="t-title">问题二：sqlite-web 阻塞</div>
+              <div class="t-meta">关键词：compose / manifest / 非核心服务</div>
+            </div>
+          </div>
+          <div class="t-item">
+            <div class="t-dot bad"></div>
+            <div class="t-card">
+              <div class="t-title">问题三：EULA/PRIVACY 免交互失败</div>
+              <div class="t-meta">关键词：EOFError / .env 覆盖 / hash</div>
+            </div>
+          </div>
+          <div class="t-item">
+            <div class="t-dot warn"></div>
+            <div class="t-card">
+              <div class="t-title">问题四：回复慢</div>
+              <div class="t-meta">关键词：模型 / 规划器 / 代理 / 资源</div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="actions" class="section">
+        <h2>3）我的动作清单（按顺序编号）</h2>
+        <ol class="list">
+          <li>固定部署目录为 <code>/root/workspace/maim-bot</code></li>
+          <li>检查 Docker / Docker Compose 版本</li>
+          <li>创建官方所需目录结构</li>
+          <li>下载 compose 与模板配置</li>
+          <li>修复 Docker 镜像拉取链路（移除 mirrors）</li>
+          <li>拉取核心镜像成功</li>
+          <li>删除/绕过 sqlite-web 服务块</li>
+          <li>生成并修改 MaiBot 核心配置文件</li>
+          <li>写入机器人 QQ、小号与私聊白名单</li>
+          <li>将 provider 指向 BaiLian，模型改为 qwen3.5-plus</li>
+          <li>处理 adapters 配置兼容问题（去除 platform_name）</li>
+          <li>处理 EULA / PRIVACY 哈希确认</li>
+          <li>通过雨云 NAT 暴露 NapCat WebUI</li>
+          <li>放行服务器防火墙端口 6099</li>
+          <li>登录 NapCat WebUI</li>
+          <li>新增 WebSocket Client 指向 <code>ws://adapters:8095</code></li>
+          <li>确认 adapters 成功连接 core</li>
+          <li>发送测试消息，开始进入性能体验排障</li>
+        </ol>
+      </section>
+
+      <section id="issues" class="section">
+        <h2>4）问题库</h2>
+        <details class="blk" open>
+          <summary>4.1 Docker 镜像拉取失败 <span class="tag bad">已解决</span></summary>
+          <p class="muted">特征：报 <code>unexpected media type text/html</code>。</p>
+          <p>根因：registry-mirrors 异常返回网页。</p>
+          <p>解决：删 mirrors，仅保留 <code>127.0.0.1:7890</code> 代理。</p>
+        </details>
+
+        <details class="blk" open>
+          <summary>4.2 sqlite-web 阻塞初始化 <span class="tag warn">已绕过</span></summary>
+          <p>这是数据库浏览器，不影响核心聊天链路。</p>
+          <p>当时为了降低资源占用和避开 manifest 问题，先移除了它。</p>
+        </details>
+
+        <details class="blk" open>
+          <summary>4.3 EULA / PRIVACY 导致 core 反复退出 <span class="tag bad">已解决</span></summary>
+          <p>compose 写了 hash 还不够，因为 <code>docker-config/mmc/.env</code> 里的旧值会覆盖。</p>
+          <p>最终修复：compose 与 mmc/.env 同步到正确值。</p>
+        </details>
+
+        <details class="blk">
+          <summary>4.4 现在最重要的问题：回复慢 <span class="tag warn">待解决</span></summary>
+          <p>已经不是“能不能用”，而是“为什么体验不丝滑”。</p>
+          <ul class="list">
+            <li>可能是模型端响应慢</li>
+            <li>可能是规划器阶段较长</li>
+            <li>可能是代理增加延迟</li>
+            <li>可能是 4GB 内存下服务抖动</li>
+          </ul>
+        </details>
+      </section>
+
+      <section id="report" class="section">
+        <h2>5）年度报告风格摘要</h2>
+        <div class="split">
+          <div class="card" style="padding:12px">
+            <h3>高频词（摘要版）</h3>
+            <ul class="list">
+              <li>Docker / compose / proxy / mirrors</li>
+              <li>MaiBot / core / adapters / napcat</li>
+              <li>WebUI / Token / NAT / 6099</li>
+              <li>EULA / PRIVACY / EOFError</li>
+              <li>BaiLian / qwen3.5-plus</li>
+              <li>WebSocket / ws://adapters:8095</li>
+            </ul>
+          </div>
+          <div class="card" style="padding:12px">
+            <h3>今天的主题</h3>
+            <ul class="list">
+              <li>主线：从“部署失败”推进到“成功可用”</li>
+              <li>核心成果：QQ 登录、WS 联通、Core 唤醒</li>
+              <li>当前阶段：体验优化，而非基础搭建</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="viz" class="section">
+        <h2>6）可视化模块（新增）</h2>
+
+        <div class="split">
+          <div class="card" style="padding:12px">
+            <h3>6.1 词云</h3>
+            <div class="wc">
+              <span class="w4">Docker</span>
+              <span class="w4">MaiBot</span>
+              <span class="w4">NapCat</span>
+              <span class="w3">adapters</span>
+              <span class="w3">core</span>
+              <span class="w3">WebUI</span>
+              <span class="w3">Token</span>
+              <span class="w3">EULA</span>
+              <span class="w3">PRIVACY</span>
+              <span class="w2">BaiLian</span>
+              <span class="w2">qwen3.5-plus</span>
+              <span class="w2">proxy</span>
+              <span class="w2">registry-mirrors</span>
+              <span class="w2">sqlite-web</span>
+              <span class="w2">NAT</span>
+              <span class="w2">6099</span>
+              <span class="w2">8095</span>
+              <span class="w1">EOFError</span>
+              <span class="w1">ws://adapters:8095</span>
+              <span class="w1">ws://core:8000/ws</span>
+            </div>
+          </div>
+
+          <div class="card" style="padding:12px">
+            <h3>6.2 主题占比</h3>
+            <div class="bars">
+              <div class="bar-row"><div>部署与初始化</div><div class="bar-wrap"><div class="bar" style="width:28%"></div></div><div>28%</div></div>
+              <div class="bar-row"><div>故障排查</div><div class="bar-wrap"><div class="bar" style="width:31%"></div></div><div>31%</div></div>
+              <div class="bar-row"><div>网络访问</div><div class="bar-wrap"><div class="bar" style="width:14%"></div></div><div>14%</div></div>
+              <div class="bar-row"><div>配置注入</div><div class="bar-wrap"><div class="bar" style="width:15%"></div></div><div>15%</div></div>
+              <div class="bar-row"><div>体验优化</div><div class="bar-wrap"><div class="bar" style="width:12%"></div></div><div>12%</div></div>
+            </div>
+            <div class="foot">这是按今天聊天内容的“体感主题权重”整理，不是机器精确统计。</div>
+          </div>
+        </div>
+
+        <div class="split" style="margin-top:12px">
+          <div class="card" style="padding:12px">
+            <h3>6.3 关键节点统计</h3>
+            <div class="kpi">
+              <div class="k"><div class="v">18+</div><div class="l">关键动作节点</div></div>
+              <div class="k"><div class="v">4</div><div class="l">核心故障类型</div></div>
+              <div class="k"><div class="v">3</div><div class="l">核心容器</div></div>
+              <div class="k"><div class="v">1</div><div class="l">当前优先优化项（回复慢）</div></div>
+            </div>
+          </div>
+          <div class="card" style="padding:12px">
+            <h3>6.4 当前资源感知（按你截图与日志整理）</h3>
+            <ul class="list">
+              <li>套餐标称：2 vCPU / 4 GB / 30+ GB</li>
+              <li>NapCat 面板显示总内存约：3911MB</li>
+              <li>某次截图内存占用约：41%</li>
+              <li>说明：加 sqlite-web 属于“吃内存/RAM”，不是显存，也不是主要吃硬盘</li>
+            </ul>
+          </div>
+        </div>
+      </section>
+
+      <section id="access" class="section">
+        <h2>7）访问与 Token</h2>
+        <ul class="list">
+          <li>你的服务器不是独立公网 IP，而是 <b>雨云 NAT 映射</b></li>
+          <li>NapCat WebUI 访问格式：<code>http://公网IP:外网端口/webui/web_login</code></li>
+          <li>你的示例：<code>http://103.40.13.93:49619/webui/web_login</code></li>
+          <li>NapCat 登录 Token：去 NapCat 容器日志里找</li>
+          <li>MaiBot WebUI Token：去 core 日志里找 <code>WebUI Access Token</code></li>
+        </ul>
+      </section>
+
+      <section id="ws" class="section">
+        <h2>8）WebSocket 对接</h2>
+        <pre><code>Name : MaiBot-Adapter
+URL  : ws://adapters:8095
+Token: 留空
+Debug: 可开启
+格式 : Array</code></pre>
+        <div class="hl">
+          你之前在 shell 里直接输入 <code>ws://maim-bot-adapters:8095</code> 报错是正常的。  
+          这不是终端命令，而是要填在 NapCat WebUI 里的 WebSocket Client 配置框里。
+        </div>
+      </section>
+
+      <section id="perf" class="section">
+        <h2>9）回复慢分析</h2>
+        <ol class="list">
+          <li>现在主链路已经通了，所以“慢”不等于“没部署成功”</li>
+          <li>更可能是模型阶段慢，而不是 WebSocket 本身慢</li>
+          <li>日志里已经出现规划器、思考、动作选择、回复准备等阶段，说明内部链路较长</li>
+          <li>若 BaiLian / qwen3.5-plus 接口有排队，也会放大体感延迟</li>
+          <li>代理也可能有影响，但在当前证据里不是第一嫌疑人</li>
+        </ol>
+
+        <details class="blk">
+          <summary>下一步建议（你后续可继续归档）</summary>
+          <ul class="list">
+            <li>记录“我发送消息的时间”</li>
+            <li>对齐 core 日志：看到消息 → 规划 → 调模型 → 回复生成</li>
+            <li>对齐 adapters 日志：转发 → 回传</li>
+            <li>补抓 <code>docker stats</code>，看回复慢时 CPU / 内存是否瞬时抖动</li>
+          </ul>
+        </details>
+      </section>
+
+      <section id="diff" class="section">
+        <h2>10）这台服务器与官方建议的差异</h2>
+        <ol class="list">
+          <li><b>访问方式不同：</b>你不是独立公网 IP，而是 NAT 映射访问</li>
+          <li><b>镜像链路不同：</b>你必须依赖本地代理，国内镜像源在你这里反而是坑</li>
+          <li><b>资源更紧：</b>4GB 档位下，每加一个辅助服务都要谨慎</li>
+          <li><b>兼容性更复杂：</b>你实际遇到 platform_name 字段不兼容，不是纯照文档就能无脑过</li>
+          <li><b>更强调日志驱动：</b>你这次几乎每一步都是靠容器日志推进的，这很像真实生产排障</li>
+        </ol>
+      </section>
+
+      <section id="appendix" class="section">
+        <h2>11）附录命令</h2>
+        <pre><code>cd /root/workspace/maim-bot
+
+# 看状态
+docker compose ps
+
+# 看核心日志
+docker compose logs --tail=200 core
+docker compose logs --tail=200 adapters
+docker compose logs --tail=200 napcat
+
+# 查 Token
+docker compose logs --tail=300 napcat | grep -i token
+docker compose logs --tail=300 core | grep -i token
+
+# 看资源
+docker stats</code></pre>
+      </section>
+
+      <div class="foot">
+        建议你在 Notion 里放这 3 层结构：<br>
+        <b>总览</b> → <b>时间线</b> → <b>问题库/命令库</b>。这样以后补内容最轻松。
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+  const q = document.getElementById('q');
+  const blks = Array.from(document.querySelectorAll('details.blk'));
+  const expandAll = document.getElementById('expandAll');
+  const collapseAll = document.getElementById('collapseAll');
+
+  function setAll(open){ blks.forEach(d => d.open = open); }
+  function clearHits(){
+    document.querySelectorAll('.hit').forEach(n => n.classList.remove('hit'));
+    blks.forEach(d => d.classList.remove('hidden'));
+  }
+  function search(){
+    const term = (q.value || '').trim().toLowerCase();
+    clearHits();
+    if(!term) return;
+    blks.forEach(d => {
+      const t = d.innerText.toLowerCase();
+      if(t.includes(term)){ d.open = true; d.classList.add('hit'); }
+      else d.classList.add('hidden');
+    });
+  }
+  q.addEventListener('input', search);
+  expandAll.addEventListener('click', () => setAll(true));
+  collapseAll.addEventListener('click', () => setAll(false));
+
+  document.querySelectorAll('[data-mode]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      document.querySelectorAll('[data-mode]').forEach(b=>b.classList.remove('primary'));
+      btn.classList.add('primary');
+      const mode = btn.dataset.mode;
+      document.getElementById('timeline-date').classList.toggle('hidden', mode !== 'date');
+      document.getElementById('timeline-issue').classList.toggle('hidden', mode !== 'issue');
+    });
+  });
+
+  document.getElementById('copyBlock').addEventListener('click', async ()=>{
+    const text = [
+      "【MaiBot部署复盘摘要】",
+      "1. 主链路已跑通：NapCat 登录成功，adapters 已连接 core，core 已成功唤醒。",
+      "2. 关键修复：删除 registry-mirrors、绕过 sqlite-web、修正 EULA/PRIVACY、处理 .env 覆盖。",
+      "3. 当前重点：回复慢，进入第二阶段性能体验优化。",
+      "4. 访问方式：雨云 NAT 映射，不是独立公网 IP。",
+      "5. WebSocket Client：ws://adapters:8095"
+    ].join("\\n");
+    try{
+      await navigator.clipboard.writeText(text);
+      alert("已复制摘要");
+    }catch(e){
+      prompt("复制失败，请手动复制：", text);
+    }
+  });
+</script>
+</body>
+</html>
